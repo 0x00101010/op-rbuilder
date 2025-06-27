@@ -1,22 +1,22 @@
+use alloy_sol_types::SolCall;
 use base_hooks_bindings::{
-    hooks_perpetual_auction::HooksPerpetualAuction,
-    uniswap_v2_arb_hook::UniswapV2ArbHook,
+    hooks_perpetual_auction::HooksPerpetualAuction, uniswap_v2_arb_hook::UniswapV2ArbHook,
 };
-use alloy_sol_types::{SolCall};
 
-use alloy_primitives::{Address, B256, U256, TxKind, Bytes};
-use std::str::FromStr;
+use crate::tx_signer::Signer;
 use alloy_consensus::TxEip1559;
+use alloy_primitives::{Address, Bytes, TxKind, B256, U256};
 use op_alloy_consensus::OpTypedTransaction;
-use reth_primitives::Recovered;
-use reth_optimism_primitives::OpTransactionSigned;
 use reth_evm::Evm;
+use reth_optimism_primitives::OpTransactionSigned;
+use reth_primitives::Recovered;
 use reth_provider::ProviderError;
 use revm::Database;
-use crate::tx_signer::Signer;
+use std::str::FromStr;
 
 pub struct HooksPerpetualAuctionHelper;
 
+#[allow(unused)]
 impl HooksPerpetualAuctionHelper {
     pub fn get_hook(
         evm: &mut impl Evm,
@@ -30,9 +30,13 @@ impl HooksPerpetualAuctionHelper {
         };
 
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, auction_contract, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, auction_contract, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let hook_data = HooksPerpetualAuction::getHookCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let hook_data =
+            HooksPerpetualAuction::getHookCall::abi_decode_returns(result.result.output().unwrap())
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(hook_data)
     }
 
@@ -48,10 +52,20 @@ impl HooksPerpetualAuctionHelper {
         };
 
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, auction_contract, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, auction_contract, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let hook_data = HooksPerpetualAuction::hooksCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-        Ok((hook_data.owner, hook_data.entrypoint, hook_data.feePerCall, hook_data.deposit, hook_data.callsRemaining))
+        let hook_data =
+            HooksPerpetualAuction::hooksCall::abi_decode_returns(result.result.output().unwrap())
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        Ok((
+            hook_data.owner,
+            hook_data.entrypoint,
+            hook_data.feePerCall,
+            hook_data.deposit,
+            hook_data.callsRemaining,
+        ))
     }
 
     pub fn get_max_originator_share(
@@ -60,9 +74,14 @@ impl HooksPerpetualAuctionHelper {
     ) -> Result<U256, Box<dyn std::error::Error>> {
         let call = HooksPerpetualAuction::MAX_ORIGINATOR_SHARECall {};
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, auction_contract, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, auction_contract, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let share = HooksPerpetualAuction::MAX_ORIGINATOR_SHARECall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let share = HooksPerpetualAuction::MAX_ORIGINATOR_SHARECall::abi_decode_returns(
+            result.result.output().unwrap(),
+        )
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(share)
     }
 
@@ -72,9 +91,14 @@ impl HooksPerpetualAuctionHelper {
     ) -> Result<U256, Box<dyn std::error::Error>> {
         let call = HooksPerpetualAuction::MIN_CALLS_DEPOSITCall {};
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, auction_contract, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, auction_contract, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let deposit = HooksPerpetualAuction::MIN_CALLS_DEPOSITCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let deposit = HooksPerpetualAuction::MIN_CALLS_DEPOSITCall::abi_decode_returns(
+            result.result.output().unwrap(),
+        )
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(deposit)
     }
 
@@ -84,9 +108,14 @@ impl HooksPerpetualAuctionHelper {
     ) -> Result<U256, Box<dyn std::error::Error>> {
         let call = HooksPerpetualAuction::getExcessETHCall {};
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, auction_contract, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, auction_contract, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let excess = HooksPerpetualAuction::getExcessETHCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let excess = HooksPerpetualAuction::getExcessETHCall::abi_decode_returns(
+            result.result.output().unwrap(),
+        )
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(excess)
     }
 
@@ -96,9 +125,14 @@ impl HooksPerpetualAuctionHelper {
     ) -> Result<U256, Box<dyn std::error::Error>> {
         let call = HooksPerpetualAuction::hookGasStipendCall {};
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, auction_contract, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, auction_contract, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let stipend = HooksPerpetualAuction::hookGasStipendCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let stipend = HooksPerpetualAuction::hookGasStipendCall::abi_decode_returns(
+            result.result.output().unwrap(),
+        )
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(stipend)
     }
 
@@ -108,9 +142,14 @@ impl HooksPerpetualAuctionHelper {
     ) -> Result<U256, Box<dyn std::error::Error>> {
         let call = HooksPerpetualAuction::originatorShareBpsCall {};
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, auction_contract, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, auction_contract, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let share_bps = HooksPerpetualAuction::originatorShareBpsCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let share_bps = HooksPerpetualAuction::originatorShareBpsCall::abi_decode_returns(
+            result.result.output().unwrap(),
+        )
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(share_bps)
     }
 
@@ -120,9 +159,13 @@ impl HooksPerpetualAuctionHelper {
     ) -> Result<Address, Box<dyn std::error::Error>> {
         let call = HooksPerpetualAuction::ownerCall {};
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, auction_contract, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, auction_contract, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let owner = HooksPerpetualAuction::ownerCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let owner =
+            HooksPerpetualAuction::ownerCall::abi_decode_returns(result.result.output().unwrap())
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(owner)
     }
 
@@ -132,9 +175,14 @@ impl HooksPerpetualAuctionHelper {
     ) -> Result<U256, Box<dyn std::error::Error>> {
         let call = HooksPerpetualAuction::totalReservedETHCall {};
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, auction_contract, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, auction_contract, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let reserved = HooksPerpetualAuction::totalReservedETHCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let reserved = HooksPerpetualAuction::totalReservedETHCall::abi_decode_returns(
+            result.result.output().unwrap(),
+        )
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(reserved)
     }
 
@@ -161,14 +209,11 @@ impl HooksPerpetualAuctionHelper {
             .map_err(|e| format!("Failed to create signer: {:?}", e))?;
 
         let nonce = match evm.db_mut().basic(signer.address)? {
-            Some(acc) => {
-                acc.nonce
-            },
+            Some(acc) => acc.nonce,
             None => {
                 return Err(format!("Account not found: {:?}", signer.address).into());
             }
         };
-
 
         // Encode the function call
         let call = HooksPerpetualAuction::executeHookCall {
@@ -196,7 +241,8 @@ impl HooksPerpetualAuctionHelper {
         });
 
         // Step 3: Sign the transaction using the Signer
-        let signed_tx = signer.sign_tx(tx)
+        let signed_tx = signer
+            .sign_tx(tx)
             .map_err(|e| format!("Failed to sign transaction: {:?}", e))?;
 
         Ok(signed_tx)
@@ -217,7 +263,10 @@ impl HooksPerpetualAuctionHelper {
                 }
                 Err(e) => {
                     // Log error but continue with other hooks
-                    eprintln!("Failed to get hook for {:?}/{:?}: {}", contract_addr, topic0, e);
+                    eprintln!(
+                        "Failed to get hook for {:?}/{:?}: {}",
+                        contract_addr, topic0, e
+                    );
                 }
             }
         }
@@ -244,7 +293,10 @@ impl HooksPerpetualAuctionHelper {
                 }
                 Err(e) => {
                     // Log error but continue with other topics
-                    eprintln!("Failed to get hook for {:?}/{:?}: {}", contract_addr, topic0, e);
+                    eprintln!(
+                        "Failed to get hook for {:?}/{:?}: {}",
+                        contract_addr, topic0, e
+                    );
                 }
             }
         }
@@ -271,7 +323,10 @@ impl HooksPerpetualAuctionHelper {
                 }
                 Err(e) => {
                     // Log error but continue with other contracts
-                    eprintln!("Failed to get hook for {:?}/{:?}: {}", contract_addr, topic0, e);
+                    eprintln!(
+                        "Failed to get hook for {:?}/{:?}: {}",
+                        contract_addr, topic0, e
+                    );
                 }
             }
         }
@@ -331,7 +386,8 @@ impl HooksPerpetualAuctionHelper {
         for contract_addr in candidate_contracts {
             for topic0 in &candidate_topics {
                 if let Ok(true) = Self::hook_exists(evm, auction_contract, contract_addr, *topic0) {
-                    if let Ok(hook) = Self::get_hook(evm, auction_contract, contract_addr, *topic0) {
+                    if let Ok(hook) = Self::get_hook(evm, auction_contract, contract_addr, *topic0)
+                    {
                         found_hooks.push((contract_addr, *topic0, hook));
                     }
                 }
@@ -387,7 +443,7 @@ impl HooksPerpetualAuctionHelper {
             chain_id: evm.chain_id(),
             nonce,
             gas_limit: 1_000_000,
-            max_fee_per_gas: 1_000_000_000,  // 1 gwei
+            max_fee_per_gas: 1_000_000_000, // 1 gwei
             max_priority_fee_per_gas: 1_000,
             to: TxKind::Call(auction_contract),
             value: total_value,
@@ -396,7 +452,8 @@ impl HooksPerpetualAuctionHelper {
         });
 
         // Sign the transaction
-        let signed_tx = signer.sign_tx(tx)
+        let signed_tx = signer
+            .sign_tx(tx)
             .map_err(|e| format!("Failed to sign transaction: {:?}", e))?;
 
         Ok(signed_tx)
@@ -408,16 +465,17 @@ impl HooksPerpetualAuctionHelper {
         auction_contract: Address,
         pair_address: Address,
         arb_hook_address: Address,
-        fee_per_call_eth: u64,  // Fee per call in ETH (e.g., 1 for 1 ETH)
-        calls_to_deposit: u64,  // Number of calls to deposit (e.g., 100)
+        fee_per_call_eth: u64, // Fee per call in ETH (e.g., 1 for 1 ETH)
+        calls_to_deposit: u64, // Number of calls to deposit (e.g., 100)
     ) -> Result<Recovered<OpTransactionSigned>, Box<dyn std::error::Error>>
     where
         E: Evm,
         E::DB: Database<Error = ProviderError>,
     {
         // Uniswap V2 Swap event topic hash
-        let swap_topic0 = B256::from_str("0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822")
-            .map_err(|e| format!("Invalid topic hash: {:?}", e))?;
+        let swap_topic0 =
+            B256::from_str("0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822")
+                .map_err(|e| format!("Invalid topic hash: {:?}", e))?;
 
         // Convert ETH to wei
         let fee_per_call = U256::from(fee_per_call_eth) * U256::from(10u64.pow(18));
@@ -435,17 +493,25 @@ impl HooksPerpetualAuctionHelper {
     }
 }
 
+#[allow(unused)]
 pub struct UniswapV2ArbHookHelper;
 
+#[allow(unused)]
 impl UniswapV2ArbHookHelper {
     pub fn get_supported_dex_count(
         evm: &mut impl Evm,
         contract_addr: Address,
     ) -> Result<u64, Box<dyn std::error::Error>> {
         let call = UniswapV2ArbHook::getSupportedDEXCountCall {}.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, contract_addr, call.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, contract_addr, call.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let count: alloy_primitives::Uint<256, 4> = UniswapV2ArbHook::getSupportedDEXCountCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let count: alloy_primitives::Uint<256, 4> =
+            UniswapV2ArbHook::getSupportedDEXCountCall::abi_decode_returns(
+                result.result.output().unwrap(),
+            )
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(count.to())
     }
 
@@ -456,9 +522,14 @@ impl UniswapV2ArbHookHelper {
     ) -> Result<Address, Box<dyn std::error::Error>> {
         let call = UniswapV2ArbHook::supportedDEXesCall(index);
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, contract_addr, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, contract_addr, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let dex_address = UniswapV2ArbHook::supportedDEXesCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let dex_address = UniswapV2ArbHook::supportedDEXesCall::abi_decode_returns(
+            result.result.output().unwrap(),
+        )
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(dex_address)
     }
 
@@ -469,9 +540,13 @@ impl UniswapV2ArbHookHelper {
     ) -> Result<UniswapV2ArbHook::DEXConfig, Box<dyn std::error::Error>> {
         let call = UniswapV2ArbHook::getDEXInfoCall { router };
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, contract_addr, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, contract_addr, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let dex_config = UniswapV2ArbHook::getDEXInfoCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let dex_config =
+            UniswapV2ArbHook::getDEXInfoCall::abi_decode_returns(result.result.output().unwrap())
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(dex_config)
     }
 
@@ -482,9 +557,13 @@ impl UniswapV2ArbHookHelper {
     ) -> Result<(Address, String, bool), Box<dyn std::error::Error>> {
         let call = UniswapV2ArbHook::dexConfigsCall(router);
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, contract_addr, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, contract_addr, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let config = UniswapV2ArbHook::dexConfigsCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let config =
+            UniswapV2ArbHook::dexConfigsCall::abi_decode_returns(result.result.output().unwrap())
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok((config.router, config.name, config.enabled))
     }
 
@@ -495,9 +574,14 @@ impl UniswapV2ArbHookHelper {
     ) -> Result<bool, Box<dyn std::error::Error>> {
         let call = UniswapV2ArbHook::authorizedTokensCall(token);
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, contract_addr, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, contract_addr, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let authorized = UniswapV2ArbHook::authorizedTokensCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let authorized = UniswapV2ArbHook::authorizedTokensCall::abi_decode_returns(
+            result.result.output().unwrap(),
+        )
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(authorized)
     }
 
@@ -507,9 +591,14 @@ impl UniswapV2ArbHookHelper {
     ) -> Result<U256, Box<dyn std::error::Error>> {
         let call = UniswapV2ArbHook::gasCostBufferCall {};
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, contract_addr, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, contract_addr, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let buffer = UniswapV2ArbHook::gasCostBufferCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let buffer = UniswapV2ArbHook::gasCostBufferCall::abi_decode_returns(
+            result.result.output().unwrap(),
+        )
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(buffer)
     }
 
@@ -519,9 +608,13 @@ impl UniswapV2ArbHookHelper {
     ) -> Result<U256, Box<dyn std::error::Error>> {
         let call = UniswapV2ArbHook::maxTradeSizeCall {};
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, contract_addr, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, contract_addr, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let max_size = UniswapV2ArbHook::maxTradeSizeCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let max_size =
+            UniswapV2ArbHook::maxTradeSizeCall::abi_decode_returns(result.result.output().unwrap())
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(max_size)
     }
 
@@ -531,9 +624,14 @@ impl UniswapV2ArbHookHelper {
     ) -> Result<U256, Box<dyn std::error::Error>> {
         let call = UniswapV2ArbHook::minProfitThresholdCall {};
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, contract_addr, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, contract_addr, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let threshold = UniswapV2ArbHook::minProfitThresholdCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let threshold = UniswapV2ArbHook::minProfitThresholdCall::abi_decode_returns(
+            result.result.output().unwrap(),
+        )
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(threshold)
     }
 
@@ -543,9 +641,13 @@ impl UniswapV2ArbHookHelper {
     ) -> Result<Address, Box<dyn std::error::Error>> {
         let call = UniswapV2ArbHook::ownerCall {};
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, contract_addr, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, contract_addr, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let owner = UniswapV2ArbHook::ownerCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let owner =
+            UniswapV2ArbHook::ownerCall::abi_decode_returns(result.result.output().unwrap())
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(owner)
     }
 
@@ -555,9 +657,13 @@ impl UniswapV2ArbHookHelper {
     ) -> Result<Address, Box<dyn std::error::Error>> {
         let call = UniswapV2ArbHook::sequencerCall {};
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, contract_addr, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, contract_addr, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let sequencer = UniswapV2ArbHook::sequencerCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let sequencer =
+            UniswapV2ArbHook::sequencerCall::abi_decode_returns(result.result.output().unwrap())
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(sequencer)
     }
 
@@ -568,9 +674,13 @@ impl UniswapV2ArbHookHelper {
     ) -> Result<Address, Box<dyn std::error::Error>> {
         let call = UniswapV2ArbHook::pairRegistryCall(pair_hash);
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, contract_addr, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, contract_addr, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let pair_address = UniswapV2ArbHook::pairRegistryCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let pair_address =
+            UniswapV2ArbHook::pairRegistryCall::abi_decode_returns(result.result.output().unwrap())
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(pair_address)
     }
 
@@ -581,9 +691,13 @@ impl UniswapV2ArbHookHelper {
     ) -> Result<Address, Box<dyn std::error::Error>> {
         let call = UniswapV2ArbHook::pairToDEXCall(pair);
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, contract_addr, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, contract_addr, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let dex_router = UniswapV2ArbHook::pairToDEXCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let dex_router =
+            UniswapV2ArbHook::pairToDEXCall::abi_decode_returns(result.result.output().unwrap())
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(dex_router)
     }
 
@@ -602,9 +716,14 @@ impl UniswapV2ArbHookHelper {
             amountIn: amount_in,
         };
         let call_data = call.abi_encode();
-        let result = evm.transact_system_call(Address::ZERO, contract_addr, call_data.into()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let result = evm
+            .transact_system_call(Address::ZERO, contract_addr, call_data.into())
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
 
-        let amount_out = UniswapV2ArbHook::_getAmountOutCall::abi_decode_returns(result.result.output().unwrap()).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        let amount_out = UniswapV2ArbHook::_getAmountOutCall::abi_decode_returns(
+            result.result.output().unwrap(),
+        )
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         Ok(amount_out)
     }
 }

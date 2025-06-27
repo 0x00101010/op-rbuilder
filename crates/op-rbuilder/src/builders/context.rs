@@ -39,12 +39,13 @@ use tokio_util::sync::CancellationToken;
 use tracing::{info, trace, warn};
 
 use crate::{
-    builders::bindings::HooksPerpetualAuctionHelper, metrics::OpRBuilderMetrics, primitives::reth::ExecutionInfo, traits::PayloadTxsBounds, tx::MaybeRevertingTransaction, tx_signer::Signer
+    builders::bindings::HooksPerpetualAuctionHelper, metrics::OpRBuilderMetrics,
+    primitives::reth::ExecutionInfo, traits::PayloadTxsBounds, tx::MaybeRevertingTransaction,
+    tx_signer::Signer,
 };
 
-
 // load the latest auction contract state
-use alloy_sol_types::{sol, SolCall};
+use alloy_sol_types::sol;
 use std::str::FromStr;
 
 sol! {
@@ -375,9 +376,13 @@ impl OpPayloadBuilderCtx {
         // let count = UniswapV2ArbHookHelper::get_supported_dex_count(&mut evm, Address::from_str("0x29a79095352a718B3D7Fe84E1F14E9F34A35598e").unwrap()).unwrap();
         // info!("Supported DEX count: {}", count);
 
-        let auction_contract = Address::from_str("0x584A6CdEA9b09Faf1d54f5110F778F74609b8f85").unwrap();
-        let pair1_contract = Address::from_str("0xA76609453c33D22d0500578F17278104e7ab0CCB").unwrap();
-        let pair1_contract_swap_topic = B256::from_str("0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822").unwrap();
+        let auction_contract =
+            Address::from_str("0x584A6CdEA9b09Faf1d54f5110F778F74609b8f85").unwrap();
+        let pair1_contract =
+            Address::from_str("0x62C0d80BF44Ba9C071c6A258E049DE42c8fae3a2").unwrap();
+        let pair1_contract_swap_topic =
+            B256::from_str("0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822")
+                .unwrap();
         // let tx = HooksPerpetualAuctionHelper::execute_hook(
         //     &mut evm,
         //     auction_contract,
@@ -500,20 +505,22 @@ impl OpPayloadBuilderCtx {
                     auction_contract,
                     pair1_contract,
                     pair1_contract_swap_topic,
-                ).unwrap();
+                )
+                .unwrap();
                 info!("Hook: {:?}", hook);
 
                 let backrun = HooksPerpetualAuctionHelper::execute_hook(
                     &mut evm,
                     auction_contract,
-                    hook.entrypoint,
+                    pair1_contract,
                     pair1_contract_swap_topic,
-                    B256::ZERO,
-                    B256::ZERO,
-                    B256::ZERO,
+                    log.topics().get(1).copied().unwrap_or(B256::ZERO),
+                    log.topics().get(2).copied().unwrap_or(B256::ZERO),
+                    log.topics().get(3).copied().unwrap_or(B256::ZERO),
                     log.data.data.to_vec(),
                     sender,
-                ).unwrap();
+                )
+                .unwrap();
                 info!("Transaction: {:?}", backrun);
 
                 let ResultAndState { result, .. } = match evm.transact(&backrun) {
