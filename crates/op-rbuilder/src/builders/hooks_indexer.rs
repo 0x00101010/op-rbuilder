@@ -8,7 +8,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 use tokio::sync::mpsc;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 /// Maintains a mapping of contract addresses and topics to their hook data
 #[derive(Debug)]
@@ -130,7 +130,10 @@ async fn processing_loop(
                 }
             },
             _ => {
-                error!("Received log with unknown topic: {:?}", topic0);
+                warn!(
+                    "HooksIndexer: received log with unhandled topic: {:?}",
+                    topic0
+                );
             }
         }
     }
