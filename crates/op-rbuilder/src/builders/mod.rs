@@ -13,11 +13,12 @@ use crate::{
     tx_signer::Signer,
 };
 
+mod bindings;
 mod context;
 mod flashblocks;
 mod generator;
+mod hooks_indexer;
 mod standard;
-mod bindings;
 
 pub use flashblocks::FlashblocksBuilder;
 pub use standard::StandardBuilder;

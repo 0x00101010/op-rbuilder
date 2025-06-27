@@ -4,7 +4,6 @@ use config::FlashblocksConfig;
 use service::FlashblocksServiceBuilder;
 
 mod config;
-//mod context;
 mod payload;
 mod service;
 mod wspub;

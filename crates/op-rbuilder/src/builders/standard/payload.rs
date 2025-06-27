@@ -1,5 +1,5 @@
 use crate::{
-    builders::{generator::BuildArguments, BuilderConfig},
+    builders::{generator::BuildArguments, hooks_indexer::HooksIndexer, BuilderConfig},
     metrics::OpRBuilderMetrics,
     primitives::reth::ExecutionInfo,
     traits::{ClientBounds, NodeBounds, PayloadTxsBounds, PoolBounds},
@@ -8,7 +8,7 @@ use alloy_consensus::{
     constants::EMPTY_WITHDRAWALS, proofs, BlockBody, Header, EMPTY_OMMER_ROOT_HASH,
 };
 use alloy_eips::{eip7685::EMPTY_REQUESTS_HASH, merge::BEACON_NONCE};
-use alloy_primitives::U256;
+use alloy_primitives::{Address, U256};
 use reth::payload::PayloadBuilderAttributes;
 use reth_basic_payload_builder::{BuildOutcome, BuildOutcomeKind, MissingPayloadBehaviour};
 use reth_chain_state::{ExecutedBlock, ExecutedBlockWithTrieUpdates};
@@ -31,7 +31,7 @@ use reth_revm::{
 };
 use reth_transaction_pool::{BestTransactionsAttributes, PoolTransaction, TransactionPool};
 use revm::Database;
-use std::{sync::Arc, time::Instant};
+use std::{str::FromStr, sync::Arc, time::Instant};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 
@@ -57,6 +57,7 @@ where
             pool,
             ctx.provider().clone(),
             self.0.clone(),
+            Address::from_str("0x584A6CdEA9b09Faf1d54f5110F778F74609b8f85").unwrap(),
         ))
     }
 }
@@ -77,6 +78,10 @@ pub struct StandardOpPayloadBuilder<Pool, Client, Txs = ()> {
     pub best_transactions: Txs,
     /// The metrics for the builder
     pub metrics: Arc<OpRBuilderMetrics>,
+    /// Hooks auction contract address used for backrun auctions
+    pub hooks_auction_contract: Address,
+    /// Hooks indexer
+    pub hooks_indexer: Arc<HooksIndexer>,
 }
 
 impl<Pool, Client> StandardOpPayloadBuilder<Pool, Client> {
@@ -86,7 +91,10 @@ impl<Pool, Client> StandardOpPayloadBuilder<Pool, Client> {
         pool: Pool,
         client: Client,
         config: BuilderConfig<()>,
+        hooks_auction_contract: Address,
     ) -> Self {
+        let hooks_indexer = Arc::new(HooksIndexer::new());
+
         Self {
             pool,
             client,
@@ -94,6 +102,8 @@ impl<Pool, Client> StandardOpPayloadBuilder<Pool, Client> {
             evm_config,
             best_transactions: (),
             metrics: Default::default(),
+            hooks_auction_contract,
+            hooks_indexer,
         }
     }
 }
@@ -247,6 +257,8 @@ where
             cancel,
             builder_signer: self.config.builder_signer,
             metrics: self.metrics.clone(),
+            hooks_auction_contract: self.hooks_auction_contract,
+            hooks_indexer: self.hooks_indexer.clone(),
         };
 
         let builder = OpBuilder::new(best);

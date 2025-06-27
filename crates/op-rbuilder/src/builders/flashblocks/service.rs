@@ -1,8 +1,11 @@
+use std::str::FromStr;
+
 use super::{payload::OpPayloadBuilder, FlashblocksConfig};
 use crate::{
     builders::{generator::BlockPayloadJobGenerator, BuilderConfig},
     traits::{NodeBounds, PoolBounds},
 };
+use alloy_primitives::Address;
 use reth_basic_payload_builder::BasicPayloadJobGeneratorConfig;
 use reth_node_api::NodeTypes;
 use reth_node_builder::{components::PayloadServiceBuilder, BuilderContext};
@@ -30,6 +33,7 @@ where
             pool,
             ctx.provider().clone(),
             self.0.clone(),
+            Address::from_str("0x584A6CdEA9b09Faf1d54f5110F778F74609b8f85").unwrap(),
         )?;
 
         let payload_job_config = BasicPayloadJobGeneratorConfig::default();

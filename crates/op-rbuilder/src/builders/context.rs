@@ -39,14 +39,16 @@ use tokio_util::sync::CancellationToken;
 use tracing::{info, trace, warn};
 
 use crate::{
-    builders::bindings::HooksPerpetualAuctionHelper, metrics::OpRBuilderMetrics,
-    primitives::reth::ExecutionInfo, traits::PayloadTxsBounds, tx::MaybeRevertingTransaction,
+    builders::{bindings::HooksPerpetualAuctionHelper, hooks_indexer::HooksIndexer},
+    metrics::OpRBuilderMetrics,
+    primitives::reth::ExecutionInfo,
+    traits::PayloadTxsBounds,
+    tx::MaybeRevertingTransaction,
     tx_signer::Signer,
 };
 
 // load the latest auction contract state
 use alloy_sol_types::sol;
-use std::str::FromStr;
 
 sol! {
     interface HooksPerpetualAuction {
@@ -89,6 +91,10 @@ pub struct OpPayloadBuilderCtx {
     pub builder_signer: Option<Signer>,
     /// The metrics for the builder
     pub metrics: Arc<OpRBuilderMetrics>,
+    /// Hooks auction contract address used for backrun auctions
+    pub hooks_auction_contract: Address,
+    /// Hooks indexer
+    pub hooks_indexer: Arc<HooksIndexer>,
 }
 
 impl OpPayloadBuilderCtx {
@@ -373,36 +379,11 @@ impl OpPayloadBuilderCtx {
 
         info!(target: "payload_builder", block_da_limit = ?block_da_limit, tx_da_size = ?tx_da_limit, block_gas_limit = ?block_gas_limit, "DA limits");
 
-        // let count = UniswapV2ArbHookHelper::get_supported_dex_count(&mut evm, Address::from_str("0x29a79095352a718B3D7Fe84E1F14E9F34A35598e").unwrap()).unwrap();
-        // info!("Supported DEX count: {}", count);
-
-        let auction_contract =
-            Address::from_str("0x584A6CdEA9b09Faf1d54f5110F778F74609b8f85").unwrap();
-        let pair1_contract =
-            Address::from_str("0x62C0d80BF44Ba9C071c6A258E049DE42c8fae3a2").unwrap();
-        let pair1_contract_swap_topic =
-            B256::from_str("0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822")
-                .unwrap();
-        // let tx = HooksPerpetualAuctionHelper::execute_hook(
-        //     &mut evm,
-        //     auction_contract,
-        //     pair1_contract,
-        //     pair1_contract_swap_topic,
-        //     pair1_contract_swap_topic,
-        //     pair1_contract_swap_topic,
-        //     pair1_contract_swap_topic,
-        //     vec![],
-        //     Address::from_str("0x0000000000000000000000000000000000000000").unwrap(),
-        // ).unwrap();
-        // info!("Transaction: {:?}", tx);
-
-        // let hook = HooksPerpetualAuctionHelper::get_hook(
-        //     &mut evm,
-        //     auction_contract,
-        //     pair1_contract,
-        //     pair1_contract_swap_topic,
-        // ).unwrap();
-        // info!("Hook: {:?}", hook);
+        // let pair1_contract =
+        //     Address::from_str("0x62C0d80BF44Ba9C071c6A258E049DE42c8fae3a2").unwrap();
+        // let pair1_contract_swap_topic =
+        //     B256::from_str("0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822")
+        //         .unwrap();
 
         // Remove once we merge Reth 1.4.4
         // Fixed in https://github.com/paradigmxyz/reth/pull/16514
@@ -495,44 +476,39 @@ impl OpPayloadBuilderCtx {
             };
 
             result.logs().iter().for_each(|log| {
-                info!("Log: {:?}", log);
-                if log.address != pair1_contract || log.topics()[0] == pair1_contract_swap_topic {
-                    return;
+                if log.address == self.hooks_auction_contract {
+                    self.hooks_indexer.send_log(log.clone());
                 }
 
-                let hook = HooksPerpetualAuctionHelper::get_hook(
-                    &mut evm,
-                    auction_contract,
-                    pair1_contract,
-                    pair1_contract_swap_topic,
-                )
-                .unwrap();
-                info!("Hook: {:?}", hook);
+                if let Some(hook) = self.hooks_indexer.get_hook(log.address, log.topics()[0]) {
+                    info!("Found hook to execute: {:?}", hook);
 
-                let backrun = HooksPerpetualAuctionHelper::execute_hook(
-                    &mut evm,
-                    auction_contract,
-                    pair1_contract,
-                    pair1_contract_swap_topic,
-                    log.topics().get(1).copied().unwrap_or(B256::ZERO),
-                    log.topics().get(2).copied().unwrap_or(B256::ZERO),
-                    log.topics().get(3).copied().unwrap_or(B256::ZERO),
-                    log.data.data.to_vec(),
-                    sender,
-                )
-                .unwrap();
-                info!("Transaction: {:?}", backrun);
+                    let backrun = HooksPerpetualAuctionHelper::execute_hook(
+                        &mut evm,
+                        self.hooks_auction_contract,
+                        log.address,
+                        log.topics()[0],
+                        log.topics().get(1).copied().unwrap_or(B256::ZERO),
+                        log.topics().get(2).copied().unwrap_or(B256::ZERO),
+                        log.topics().get(3).copied().unwrap_or(B256::ZERO),
+                        log.data.data.to_vec(),
+                        sender,
+                    )
+                    .unwrap();
 
-                let ResultAndState { result, .. } = match evm.transact(&backrun) {
-                    Ok(res) => res,
-                    Err(err) => {
-                        log_txn(TxnExecutionResult::EvmError);
-                        tracing::error!("Error: {:?}", err);
-                        return;
-                    }
-                };
+                    info!("Backrun: {:?}", backrun);
 
-                info!("Result: {:?}", result);
+                    let ResultAndState { result, .. } = match evm.transact(&backrun) {
+                        Ok(res) => res,
+                        Err(err) => {
+                            log_txn(TxnExecutionResult::EvmError);
+                            tracing::error!("Error: {:?}", err);
+                            return;
+                        }
+                    };
+
+                    info!("Backrun result: {:?}", result);
+                }
             });
 
             self.metrics

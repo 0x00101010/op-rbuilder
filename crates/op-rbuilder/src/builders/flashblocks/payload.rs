@@ -1,5 +1,6 @@
 use core::time::Duration;
 use std::{
+    collections::HashMap,
     sync::Arc,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
@@ -9,6 +10,7 @@ use crate::{
     builders::{
         context::{estimate_gas_for_builder_tx, OpPayloadBuilderCtx},
         generator::{BlockCell, BuildArguments},
+        hooks_indexer::HooksIndexer,
         BuilderConfig,
     },
     metrics::OpRBuilderMetrics,
@@ -19,7 +21,7 @@ use alloy_consensus::{
     constants::EMPTY_WITHDRAWALS, proofs, BlockBody, Header, EMPTY_OMMER_ROOT_HASH,
 };
 use alloy_eips::{eip7685::EMPTY_REQUESTS_HASH, merge::BEACON_NONCE, Encodable2718};
-use alloy_primitives::{map::foldhash::HashMap, Address, B256, U256};
+use alloy_primitives::{Address, B256, U256};
 use reth::payload::PayloadBuilderAttributes;
 use reth_basic_payload_builder::BuildOutcome;
 use reth_evm::{execute::BlockBuilder, ConfigureEvm};
@@ -69,6 +71,10 @@ pub struct OpPayloadBuilder<Pool, Client> {
     pub config: BuilderConfig<FlashblocksConfig>,
     /// The metrics for the builder
     pub metrics: Arc<OpRBuilderMetrics>,
+    /// Hooks auction contract address used for backrun auctions
+    pub hooks_auction_contract: Address,
+    /// Hooks indexer
+    pub hooks_indexer: Arc<HooksIndexer>,
 }
 
 impl<Pool, Client> OpPayloadBuilder<Pool, Client> {
@@ -78,9 +84,12 @@ impl<Pool, Client> OpPayloadBuilder<Pool, Client> {
         pool: Pool,
         client: Client,
         config: BuilderConfig<FlashblocksConfig>,
+        hooks_auction_contract: Address,
     ) -> eyre::Result<Self> {
         let metrics = Arc::new(OpRBuilderMetrics::default());
         let ws_pub = WebSocketPublisher::new(config.specific.ws_addr, Arc::clone(&metrics))?.into();
+
+        let hooks_indexer = Arc::new(HooksIndexer::new());
 
         Ok(Self {
             evm_config,
@@ -89,6 +98,8 @@ impl<Pool, Client> OpPayloadBuilder<Pool, Client> {
             ws_pub,
             config,
             metrics,
+            hooks_auction_contract,
+            hooks_indexer,
         })
     }
 }
@@ -189,6 +200,8 @@ where
             da_config: self.config.da_config.clone(),
             builder_signer: self.config.builder_signer,
             metrics: Default::default(),
+            hooks_auction_contract: self.hooks_auction_contract,
+            hooks_indexer: self.hooks_indexer.clone(),
         };
 
         let state_provider = self.client.state_by_block_hash(ctx.parent().hash())?;
