@@ -33,7 +33,7 @@ where
             pool,
             ctx.provider().clone(),
             self.0.clone(),
-            Address::from_str("0x584A6CdEA9b09Faf1d54f5110F778F74609b8f85").unwrap(),
+            Address::from_str("0x68601dd9C47aA7751b5685AAb39F553Fa3a7cA95").unwrap(),
         )?;
 
         let payload_job_config = BasicPayloadJobGeneratorConfig::default();

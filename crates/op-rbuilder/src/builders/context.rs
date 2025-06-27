@@ -379,12 +379,6 @@ impl OpPayloadBuilderCtx {
 
         info!(target: "payload_builder", block_da_limit = ?block_da_limit, tx_da_size = ?tx_da_limit, block_gas_limit = ?block_gas_limit, "DA limits");
 
-        // let pair1_contract =
-        //     Address::from_str("0x62C0d80BF44Ba9C071c6A258E049DE42c8fae3a2").unwrap();
-        // let pair1_contract_swap_topic =
-        //     B256::from_str("0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822")
-        //         .unwrap();
-
         // Remove once we merge Reth 1.4.4
         // Fixed in https://github.com/paradigmxyz/reth/pull/16514
         self.metrics
@@ -474,42 +468,7 @@ impl OpPayloadBuilderCtx {
                     return Err(PayloadBuilderError::EvmExecutionError(Box::new(err)));
                 }
             };
-
-            result.logs().iter().for_each(|log| {
-                if log.address == self.hooks_auction_contract {
-                    self.hooks_indexer.send_log(log.clone());
-                }
-
-                if let Some(hook) = self.hooks_indexer.get_hook(log.address, log.topics()[0]) {
-                    info!("Found hook to execute: {:?}", hook);
-
-                    let backrun = HooksPerpetualAuctionHelper::execute_hook(
-                        &mut evm,
-                        self.hooks_auction_contract,
-                        log.address,
-                        log.topics()[0],
-                        log.topics().get(1).copied().unwrap_or(B256::ZERO),
-                        log.topics().get(2).copied().unwrap_or(B256::ZERO),
-                        log.topics().get(3).copied().unwrap_or(B256::ZERO),
-                        log.data.data.to_vec(),
-                        sender,
-                    )
-                    .unwrap();
-
-                    info!("Backrun: {:?}", backrun);
-
-                    let ResultAndState { result, .. } = match evm.transact(&backrun) {
-                        Ok(res) => res,
-                        Err(err) => {
-                            log_txn(TxnExecutionResult::EvmError);
-                            tracing::error!("Error: {:?}", err);
-                            return;
-                        }
-                    };
-
-                    info!("Backrun result: {:?}", result);
-                }
-            });
+            let result_clone = result.clone();
 
             self.metrics
                 .tx_simulation_duration
@@ -550,6 +509,60 @@ impl OpPayloadBuilderCtx {
 
             // commit changes
             evm.db_mut().commit(state);
+
+            result_clone.logs().iter().for_each(|log| {
+                if log.address == self.hooks_auction_contract {
+                    self.hooks_indexer.send_log(log);
+                }
+
+                if let Some(hook) = self.hooks_indexer.get_hook_to_execute(log) {
+                    info!("Found hook to execute: {:?}", hook);
+
+                    let backrun = HooksPerpetualAuctionHelper::execute_hook(
+                        &mut evm,
+                        self.hooks_auction_contract,
+                        log.address,
+                        hook.filter_hash,
+                        log.topics()[0],
+                        log.topics().get(1).copied().unwrap_or(B256::ZERO),
+                        log.topics().get(2).copied().unwrap_or(B256::ZERO),
+                        log.topics().get(3).copied().unwrap_or(B256::ZERO),
+                        log.data.data.to_vec(),
+                        sender,
+                    )
+                    .unwrap();
+
+                    info!("Backrun: {:?}", backrun);
+
+                    let ResultAndState { result, state } = match evm.transact(&backrun) {
+                        Ok(res) => res,
+                        Err(err) => {
+                            log_txn(TxnExecutionResult::EvmError);
+                            tracing::error!("Error: {:?}", err);
+                            return;
+                        }
+                    };
+                    info!("Backrun result: {:?}", &result);
+
+                    result.logs().iter().for_each(|log| {
+                        if log.address == self.hooks_auction_contract {
+                            self.hooks_indexer.send_log(log);
+                        }
+                    });
+
+                    // let ctx = ReceiptBuilderCtx {
+                    //     tx: backrun.inner(),
+                    //     evm: &evm,
+                    //     result: result.clone(),
+                    //     state: &state,
+                    //     cumulative_gas_used: info.cumulative_gas_used + result.gas_used(),
+                    // };
+                    // info.receipts.push(self.build_receipt(ctx, None));
+
+                    // // commit changes
+                    // evm.db_mut().commit(state);
+                }
+            });
 
             // update add to total fees
             let miner_fee = tx
