@@ -43,7 +43,6 @@ use crate::{
 };
 
 
-use crate::builders::bindings::UniswapV2ArbHookHelper;
 // load the latest auction contract state
 use alloy_sol_types::{sol, SolCall};
 use std::str::FromStr;
@@ -376,8 +375,8 @@ impl OpPayloadBuilderCtx {
         // let count = UniswapV2ArbHookHelper::get_supported_dex_count(&mut evm, Address::from_str("0x29a79095352a718B3D7Fe84E1F14E9F34A35598e").unwrap()).unwrap();
         // info!("Supported DEX count: {}", count);
 
-        let auction_contract = Address::from_str("0x292Fd8c1fCFE109089FB38a1528379A1Fe6Cae72").unwrap();
-        let pair1_contract = Address::from_str("0x29a79095352a718B3D7Fe84E1F14E9F34A35598e").unwrap();
+        let auction_contract = Address::from_str("0x584A6CdEA9b09Faf1d54f5110F778F74609b8f85").unwrap();
+        let pair1_contract = Address::from_str("0xA76609453c33D22d0500578F17278104e7ab0CCB").unwrap();
         let pair1_contract_swap_topic = B256::from_str("0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822").unwrap();
         // let tx = HooksPerpetualAuctionHelper::execute_hook(
         //     &mut evm,
@@ -410,9 +409,12 @@ impl OpPayloadBuilderCtx {
             .set(tx_da_limit.map_or(-1.0, |v| v as f64));
 
         while let Some(tx) = best_txs.next(()) {
+            info!("Executing best transaction, {:?}", tx);
+
             let interop = tx.interop_deadline();
             let exclude_reverting_txs = tx.exclude_reverting_txs();
             let tx_da_size = tx.estimated_da_size();
+            let sender = tx.sender();
             let tx = tx.into_consensus();
             let tx_hash = tx.tx_hash();
 
@@ -488,15 +490,42 @@ impl OpPayloadBuilderCtx {
             };
 
             result.logs().iter().for_each(|log| {
-                if log.address == pair1_contract && log.topics()[0] == pair1_contract_swap_topic {
-                    let hook = HooksPerpetualAuctionHelper::get_hook(
-                        &mut evm,
-                        auction_contract,
-                        pair1_contract,
-                        pair1_contract_swap_topic,
-                    ).unwrap();
-                    info!("Hook: {:?}", hook);
+                info!("Log: {:?}", log);
+                if log.address != pair1_contract || log.topics()[0] == pair1_contract_swap_topic {
+                    return;
                 }
+
+                let hook = HooksPerpetualAuctionHelper::get_hook(
+                    &mut evm,
+                    auction_contract,
+                    pair1_contract,
+                    pair1_contract_swap_topic,
+                ).unwrap();
+                info!("Hook: {:?}", hook);
+
+                let backrun = HooksPerpetualAuctionHelper::execute_hook(
+                    &mut evm,
+                    auction_contract,
+                    hook.entrypoint,
+                    pair1_contract_swap_topic,
+                    B256::ZERO,
+                    B256::ZERO,
+                    B256::ZERO,
+                    log.data.data.to_vec(),
+                    sender,
+                ).unwrap();
+                info!("Transaction: {:?}", backrun);
+
+                let ResultAndState { result, .. } = match evm.transact(&backrun) {
+                    Ok(res) => res,
+                    Err(err) => {
+                        log_txn(TxnExecutionResult::EvmError);
+                        tracing::error!("Error: {:?}", err);
+                        return;
+                    }
+                };
+
+                info!("Result: {:?}", result);
             });
 
             self.metrics

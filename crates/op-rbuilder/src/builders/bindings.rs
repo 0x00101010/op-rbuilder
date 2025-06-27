@@ -186,8 +186,8 @@ impl HooksPerpetualAuctionHelper {
         let tx = OpTypedTransaction::Eip1559(TxEip1559 {
             chain_id: evm.chain_id(),
             nonce,
-            gas_limit: 300_000_000,
-            max_fee_per_gas: 300_000_000,
+            gas_limit: 60_000_000,
+            max_fee_per_gas: 300_000_000_000,
             max_priority_fee_per_gas: 1_000,
             to: TxKind::Call(auction_contract),
             value: U256::ZERO,
@@ -209,7 +209,7 @@ impl HooksPerpetualAuctionHelper {
         hook_pairs: Vec<(Address, B256)>,
     ) -> Result<Vec<(Address, B256, HooksPerpetualAuction::Hook)>, Box<dyn std::error::Error>> {
         let mut hooks = Vec::new();
-        
+
         for (contract_addr, topic0) in hook_pairs {
             match Self::get_hook(evm, auction_contract, contract_addr, topic0) {
                 Ok(hook) => {
@@ -221,7 +221,7 @@ impl HooksPerpetualAuctionHelper {
                 }
             }
         }
-        
+
         Ok(hooks)
     }
 
@@ -233,7 +233,7 @@ impl HooksPerpetualAuctionHelper {
         topics: Vec<B256>,
     ) -> Result<Vec<(B256, HooksPerpetualAuction::Hook)>, Box<dyn std::error::Error>> {
         let mut hooks = Vec::new();
-        
+
         for topic0 in topics {
             match Self::get_hook(evm, auction_contract, contract_addr, topic0) {
                 Ok(hook) => {
@@ -248,7 +248,7 @@ impl HooksPerpetualAuctionHelper {
                 }
             }
         }
-        
+
         Ok(hooks)
     }
 
@@ -260,7 +260,7 @@ impl HooksPerpetualAuctionHelper {
         contracts: Vec<Address>,
     ) -> Result<Vec<(Address, HooksPerpetualAuction::Hook)>, Box<dyn std::error::Error>> {
         let mut hooks = Vec::new();
-        
+
         for contract_addr in contracts {
             match Self::get_hook(evm, auction_contract, contract_addr, topic0) {
                 Ok(hook) => {
@@ -275,7 +275,7 @@ impl HooksPerpetualAuctionHelper {
                 }
             }
         }
-        
+
         Ok(hooks)
     }
 
@@ -327,7 +327,7 @@ impl HooksPerpetualAuctionHelper {
         candidate_topics: Vec<B256>,
     ) -> Result<Vec<(Address, B256, HooksPerpetualAuction::Hook)>, Box<dyn std::error::Error>> {
         let mut found_hooks = Vec::new();
-        
+
         for contract_addr in candidate_contracts {
             for topic0 in &candidate_topics {
                 if let Ok(true) = Self::hook_exists(evm, auction_contract, contract_addr, *topic0) {
@@ -337,7 +337,7 @@ impl HooksPerpetualAuctionHelper {
                 }
             }
         }
-        
+
         Ok(found_hooks)
     }
 
@@ -418,7 +418,7 @@ impl HooksPerpetualAuctionHelper {
         // Uniswap V2 Swap event topic hash
         let swap_topic0 = B256::from_str("0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822")
             .map_err(|e| format!("Invalid topic hash: {:?}", e))?;
-        
+
         // Convert ETH to wei
         let fee_per_call = U256::from(fee_per_call_eth) * U256::from(10u64.pow(18));
         let calls = U256::from(calls_to_deposit);
