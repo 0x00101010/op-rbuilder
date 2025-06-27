@@ -1,6 +1,8 @@
-use alloy_primitives::{Address, Log, B256};
+use alloy_primitives::{Address, Log, B256, U256};
 use alloy_sol_types::SolEvent;
-use base_hooks_bindings::hooks_perpetual_auction::HooksPerpetualAuction::{Hook, NewBid};
+use base_hooks_bindings::hooks_perpetual_auction::HooksPerpetualAuction::{
+    Hook, HookExecuted, NewBid,
+};
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock},
@@ -54,35 +56,81 @@ async fn processing_loop(
     hook_registry: Arc<RwLock<HashMap<(Address, B256), Hook>>>,
 ) {
     while let Some(log) = receiver.recv().await {
-        // Check if this is a NewBid event
-        if log.topics()[0] == NewBid::SIGNATURE_HASH {
-            match NewBid::decode_log_validate(&log) {
-                Ok(new_bid) => {
-                    let key = (new_bid.contractAddr, new_bid.topic0);
-                    let hook = Hook {
-                        owner: new_bid.bidder,
-                        entrypoint: new_bid.entrypoint,
-                        feePerCall: new_bid.feePerCall,
-                        deposit: new_bid.feePerCall * new_bid.callsDeposited,
-                        callsRemaining: new_bid.callsDeposited,
+        let topic0 = log.topics()[0];
+
+        match topic0 {
+            NewBid::SIGNATURE_HASH => {
+                match NewBid::decode_log_validate(&log) {
+                    Ok(new_bid) => {
+                        let key = (new_bid.contractAddr, new_bid.topic0);
+                        let hook = Hook {
+                            owner: new_bid.bidder,
+                            entrypoint: new_bid.entrypoint,
+                            feePerCall: new_bid.feePerCall,
+                            deposit: new_bid.feePerCall * new_bid.callsDeposited,
+                            callsRemaining: new_bid.callsDeposited,
+                        };
+
+                        info!(
+                            "Processing NewBid event: contract={:?}, topic={:?}, bidder={:?}",
+                            new_bid.contractAddr, new_bid.topic0, new_bid.bidder
+                        );
+
+                        // Update the registry
+                        if let Ok(mut registry) = hook_registry.write() {
+                            registry.insert(key, hook);
+                            info!("Updated hook registry, total hooks: {}", registry.len());
+                        } else {
+                            error!("Failed to acquire write lock for hook registry");
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to decode NewBid log: {:?}", e);
+                    }
+                }
+            }
+            HookExecuted::SIGNATURE_HASH => match HookExecuted::decode_log_validate(&log) {
+                Ok(hook_executed) => {
+                    let key = (hook_executed.contractAddr, hook_executed.topic0);
+                    let existing_hook = hook_registry
+                        .read()
+                        .unwrap()
+                        .get(&key)
+                        .cloned()
+                        .expect("Hook should have existed if it was executed");
+
+                    let new_hook = Hook {
+                        deposit: existing_hook.deposit - hook_executed.feePerCall,
+                        callsRemaining: existing_hook.callsRemaining.saturating_sub(U256::from(1)),
+                        ..existing_hook
                     };
-
-                    info!(
-                        "Processing NewBid event: contract={:?}, topic={:?}, bidder={:?}",
-                        new_bid.contractAddr, new_bid.topic0, new_bid.bidder
-                    );
-
-                    // Update the registry
-                    if let Ok(mut registry) = hook_registry.write() {
-                        registry.insert(key, hook);
-                        info!("Updated hook registry, total hooks: {}", registry.len());
+                    if new_hook.callsRemaining == U256::ZERO {
+                        // Remove the hook from the registry
+                        if let Ok(mut registry) = hook_registry.write() {
+                            registry.remove(&key);
+                            info!(
+                                "Removed hook from registry, total hooks: {}",
+                                registry.len()
+                            );
+                        } else {
+                            error!("Failed to acquire write lock for hook registry");
+                        }
                     } else {
-                        error!("Failed to acquire write lock for hook registry");
+                        // Update the registry
+                        if let Ok(mut registry) = hook_registry.write() {
+                            registry.insert(key, new_hook);
+                            info!("Updated hook registry, total hooks: {}", registry.len());
+                        } else {
+                            error!("Failed to acquire write lock for hook registry");
+                        }
                     }
                 }
                 Err(e) => {
-                    error!("Failed to decode NewBid log: {:?}", e);
+                    error!("Failed to decode HookExecuted log: {:?}", e);
                 }
+            },
+            _ => {
+                error!("Received log with unknown topic: {:?}", topic0);
             }
         }
     }

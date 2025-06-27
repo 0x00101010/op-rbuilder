@@ -1,7 +1,5 @@
 use alloy_sol_types::SolCall;
-use base_hooks_bindings::{
-    hooks_perpetual_auction::HooksPerpetualAuction, uniswap_v2_arb_hook::UniswapV2ArbHook,
-};
+use base_hooks_bindings::hooks_perpetual_auction::HooksPerpetualAuction;
 
 use crate::tx_signer::Signer;
 use alloy_consensus::TxEip1559;
